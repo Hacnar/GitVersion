@@ -45,6 +45,9 @@ namespace GitVersion.Cache
         {
             var dotGitDirectory = gitPreparer.GetDotGitDirectory();
 
+            if (dotGitDirectory.Contains(Path.Combine(".git", "worktrees")))
+                dotGitDirectory = Directory.GetParent(Directory.GetParent(dotGitDirectory).FullName).FullName;
+
             // traverse the directory and get a list of files, use that for GetHash
             var contents = CalculateDirectoryContents(Path.Combine(dotGitDirectory, "refs"));
 
