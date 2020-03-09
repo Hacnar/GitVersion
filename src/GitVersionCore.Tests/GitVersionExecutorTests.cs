@@ -447,7 +447,7 @@ namespace GitVersionCore.Tests
         }
 
         [Test]
-        [Ignore]
+        [Ignore("temp")]
         public void GetDotGitDirectoryNoWorktree()
         {
             using var fixture = new EmptyRepositoryFixture();
