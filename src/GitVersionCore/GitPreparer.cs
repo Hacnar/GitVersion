@@ -72,9 +72,9 @@ namespace GitVersion
             if (string.IsNullOrEmpty(gitDirectory))
                 throw new DirectoryNotFoundException("Can't find the .git directory in " + gitDirectory);
 
-            return gitDirectory.Contains(Path.Combine(".git", "worktrees"))
+            return /*gitDirectory.Contains(Path.Combine(".git", "worktrees"))
                 ? Directory.GetParent(Directory.GetParent(gitDirectory).FullName).FullName
-                : gitDirectory;
+                :*/ gitDirectory;
         }
 
         public string GetProjectRootDirectoryInternal()
