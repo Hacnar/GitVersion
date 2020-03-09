@@ -13,3 +13,10 @@ build_script:
 
 test: off
 skip_tags: true
+
+deploy:
+- provider: GitHub
+  auth_token:
+    secure: 5g5zfs39hkEhY2AwapE6lVhaeabzuJ/T6MEeK6mLikK+nXOjO57eV4FM6kBxFwCo
+  artifact: all
+  draft: true
