@@ -55,6 +55,7 @@ namespace GitVersionCore.Tests
         [NonParallelizable]
         [TestCase("GV_master", "https://github.com/GitTools/GitVersion", "master", "4783d325521463cd6cf1b61074352da84451f25d", "4.0.0+1086")]
         [TestCase("GV_master", "https://github.com/GitTools/GitVersion", "master", "3bdcd899530b4e9b37d13639f317da04a749e728", "4.0.0+1092")]
+        [Ignore("temp")]
         public void FindsVersionInDynamicRepo(string name, string url, string targetBranch, string commitId, string expectedFullSemVer)
         {
             var root = Path.Combine(workDirectory, name);
