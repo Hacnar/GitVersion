@@ -17,9 +17,9 @@ namespace GitVersion.Extensions
             if (string.IsNullOrEmpty(dotGitDirectory))
                 throw new DirectoryNotFoundException($"Can't find the .git directory in {dotGitDirectory}");
 
-            return dotGitDirectory.Contains(Path.Combine(".git", "worktrees"))
+            return /*dotGitDirectory.Contains(Path.Combine(".git", "worktrees"))
                 ? Directory.GetParent(Directory.GetParent(dotGitDirectory).FullName).FullName
-                : dotGitDirectory;
+                :*/ dotGitDirectory;
         }
 
         public static string GetProjectRootDirectory(this GitVersionOptions gitVersionOptions)
