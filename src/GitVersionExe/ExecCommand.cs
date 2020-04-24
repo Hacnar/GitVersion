@@ -1,87 +1,33 @@
-using GitVersion.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using GitVersion.Exceptions;
-using GitVersion.OutputFormatters;
-using GitVersion.OutputVariables;
-using GitVersion.Extensions;
-using GitVersion.Extensions.VersionAssemblyInfoResources;
+using GitVersion.Helpers;
 using GitVersion.Logging;
+using GitVersion.OutputVariables;
 using Microsoft.Extensions.Options;
 
 namespace GitVersion
 {
     public class ExecCommand : IExecCommand
     {
-        private static readonly bool RunningOnUnix = !RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
-        private readonly IFileSystem fileSystem;
-        private readonly IBuildServerResolver buildServerResolver;
         private readonly ILog log;
-        private readonly IGitVersionCalculator gitVersionCalculator;
-        private readonly IOptions<Arguments> options;
+        private readonly IOptions<GitVersionOptions> options;
 
-        public ExecCommand(IFileSystem fileSystem, IBuildServerResolver buildServerResolver, ILog log, IGitVersionCalculator gitVersionCalculator, IOptions<Arguments> options)
+        public ExecCommand(ILog log, IOptions<GitVersionOptions> options)
         {
-            this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-            this.buildServerResolver = buildServerResolver ?? throw new ArgumentNullException(nameof(buildServerResolver));
             this.log = log ?? throw new ArgumentNullException(nameof(log));
-            this.gitVersionCalculator = gitVersionCalculator ?? throw new ArgumentNullException(nameof(gitVersionCalculator));
             this.options = options ?? throw new ArgumentNullException(nameof(options));
         }
 
-        public void Execute()
+        public void Execute(VersionVariables variables)
         {
-            log.Info($"Running on {(RunningOnUnix ? "Unix" : "Windows")}.");
+            var gitVersionOptions = options.Value;
 
-            var variables = gitVersionCalculator.CalculateVersionVariables();
-
-            var arguments = options.Value;
-
-            if (arguments.Output.Contains(OutputType.BuildServer))
-            {
-                var buildServer = buildServerResolver.Resolve();
-                buildServer?.WriteIntegration(Console.WriteLine, variables);
-            }
-            if (arguments.Output.Contains(OutputType.Json))
-            {
-                switch (arguments.ShowVariable)
-                {
-                    case null:
-                        Console.WriteLine(variables.ToString());
-                        break;
-
-                    default:
-                        if (!variables.TryGetValue(arguments.ShowVariable, out var part))
-                        {
-                            throw new WarningException($"'{arguments.ShowVariable}' variable does not exist");
-                        }
-
-                        Console.WriteLine(part);
-                        break;
-                }
-            }
-
-            if (arguments.UpdateWixVersionFile)
-            {
-                using var wixVersionFileUpdater = new WixVersionFileUpdater(arguments.TargetPath, variables, fileSystem, log);
-                wixVersionFileUpdater.Update();
-            }
-
-            using var assemblyInfoUpdater = new AssemblyInfoFileUpdater(arguments.UpdateAssemblyInfoFileName, arguments.TargetPath, variables, fileSystem, log, arguments.EnsureAssemblyInfo);
-            if (arguments.UpdateAssemblyInfo)
-            {
-                assemblyInfoUpdater.Update();
-                assemblyInfoUpdater.CommitChanges();
-            }
-
-            RunExecCommandIfNeeded(arguments, arguments.TargetPath, variables, log);
-            RunMsBuildIfNeeded(arguments, arguments.TargetPath, variables, log);
+            RunExecCommandIfNeeded(gitVersionOptions, gitVersionOptions.WorkingDirectory, variables, log);
+            RunMsBuildIfNeeded(gitVersionOptions, gitVersionOptions.WorkingDirectory, variables, log);
         }
 
-        private static bool RunMsBuildIfNeeded(Arguments args, string workingDirectory, VersionVariables variables, ILog log)
+        private static bool RunMsBuildIfNeeded(GitVersionOptions args, string workingDirectory, VersionVariables variables, ILog log)
         {
 #pragma warning disable CS0612 // Type or member is obsolete
             if (string.IsNullOrEmpty(args.Proj)) return false;
@@ -93,7 +39,7 @@ namespace GitVersion
             return RunExecCommandIfNeeded(args, workingDirectory, variables, log);
         }
 
-        private static bool RunExecCommandIfNeeded(Arguments args, string workingDirectory, VersionVariables variables, ILog log)
+        private static bool RunExecCommandIfNeeded(GitVersionOptions args, string workingDirectory, VersionVariables variables, ILog log)
         {
 #pragma warning disable CS0612 // Type or member is obsolete
             if (string.IsNullOrEmpty(args.Exec)) return false;

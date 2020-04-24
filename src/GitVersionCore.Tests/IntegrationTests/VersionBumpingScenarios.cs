@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using GitTools.Testing;
-using NUnit.Framework;
-using GitVersion.Configuration;
+using GitVersion.Model.Configuration;
 using GitVersionCore.Tests.Helpers;
+using NUnit.Framework;
 
 namespace GitVersionCore.Tests.IntegrationTests
 {
@@ -30,7 +30,7 @@ namespace GitVersionCore.Tests.IntegrationTests
             fixture.Repository.MakeATaggedCommit("1.0.0-pre.1");
             fixture.Repository.MakeACommit();
 
-            fixture.AssertFullSemver(configuration, "1.0.0-pre.2+1");
+            fixture.AssertFullSemver("1.0.0-pre.2+1", configuration);
         }
 
         [Test]

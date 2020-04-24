@@ -1,9 +1,8 @@
 using System;
-using GitVersion.Exceptions;
 using GitVersion.Extensions;
 using GitVersion.Logging;
+using GitVersion.Model;
 using GitVersion.MSBuildTask.Tasks;
-using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -47,29 +46,40 @@ namespace GitVersion.MSBuildTask
         private static void Configure(IServiceProvider sp, GitVersionTaskBase task)
         {
             var log = sp.GetService<ILog>();
-            var buildServerResolver = sp.GetService<IBuildServerResolver>();
-            var arguments = sp.GetService<IOptions<Arguments>>().Value;
+            var buildAgent = sp.GetService<ICurrentBuildAgent>();
+            var gitVersionOptions = sp.GetService<IOptions<GitVersionOptions>>().Value;
 
             log.AddLogAppender(new MsBuildAppender(task.Log));
-            var buildServer = buildServerResolver.Resolve();
-            arguments.NoFetch = arguments.NoFetch || buildServer != null && buildServer.PreventFetch();
+
+            if (buildAgent != null)
+            {
+                gitVersionOptions.Output.Add(OutputType.BuildServer);
+            }
+            gitVersionOptions.Settings.NoFetch = gitVersionOptions.Settings.NoFetch || buildAgent != null && buildAgent.PreventFetch();
         }
 
         private static IServiceProvider BuildServiceProvider(GitVersionTaskBase task)
         {
             var services = new ServiceCollection();
 
-            var arguments = new Arguments
+            var gitVersionOptions = new GitVersionOptions
             {
-                TargetPath = task.SolutionDirectory,
-                ConfigFile = task.ConfigFilePath,
-                NoFetch = task.NoFetch,
-                NoNormalize = task.NoNormalize
+                WorkingDirectory = task.SolutionDirectory,
+                ConfigInfo = { ConfigFile = task.ConfigFilePath },
+                Settings =
+                {
+                    NoFetch = task.NoFetch,
+                    NoNormalize = task.NoNormalize
+                }
             };
 
-            services.AddSingleton(_ => Options.Create(arguments));
-            services.AddSingleton<IGitVersionTaskExecutor, GitVersionTaskExecutor>();
+            gitVersionOptions.Output.Add(OutputType.BuildServer);
+
+            services.AddSingleton(Options.Create(gitVersionOptions));
             services.AddModule(new GitVersionCoreModule());
+            services.AddModule(new GitVersionTaskModule());
+
+            services.AddSingleton<IConsole>(new MsBuildAdapter(task.Log));
 
             var sp = services.BuildServiceProvider();
             Configure(sp, task);

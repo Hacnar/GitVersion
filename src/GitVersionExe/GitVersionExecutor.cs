@@ -2,57 +2,67 @@ using System;
 using System.IO;
 using System.Reflection;
 using GitVersion.Configuration;
-using GitVersion.Exceptions;
-using GitVersion.Logging;
-using GitVersion.OutputFormatters;
 using GitVersion.Extensions;
+using GitVersion.Logging;
+using GitVersion.Model;
 
 namespace GitVersion
 {
     public class GitVersionExecutor : IGitVersionExecutor
     {
         private readonly ILog log;
+        private readonly IConsole console;
         private readonly IConfigFileLocator configFileLocator;
         private readonly IHelpWriter helpWriter;
         private readonly IExecCommand execCommand;
         private readonly IConfigProvider configProvider;
-        private readonly IBuildServerResolver buildServerResolver;
-        private readonly IGitPreparer gitPreparer;
+        private readonly IGitVersionTool gitVersionTool;
         private readonly IVersionWriter versionWriter;
 
-        public GitVersionExecutor(ILog log, IConfigFileLocator configFileLocator, IVersionWriter versionWriter, IHelpWriter helpWriter,
-            IExecCommand execCommand, IConfigProvider configProvider, IBuildServerResolver buildServerResolver, IGitPreparer gitPreparer)
+        public GitVersionExecutor(ILog log, IConsole console,
+            IConfigFileLocator configFileLocator, IConfigProvider configProvider, IGitVersionTool gitVersionTool,
+            IVersionWriter versionWriter, IHelpWriter helpWriter, IExecCommand execCommand)
         {
             this.log = log ?? throw new ArgumentNullException(nameof(log));
+            this.console = console ?? throw new ArgumentNullException(nameof(console));
             this.configFileLocator = configFileLocator ?? throw new ArgumentNullException(nameof(configFileLocator));
+            this.configProvider = configProvider ?? throw new ArgumentNullException(nameof(configFileLocator));
+
+            this.gitVersionTool = gitVersionTool ?? throw new ArgumentNullException(nameof(gitVersionTool));
+
             this.versionWriter = versionWriter ?? throw new ArgumentNullException(nameof(versionWriter));
             this.helpWriter = helpWriter ?? throw new ArgumentNullException(nameof(helpWriter));
+
             this.execCommand = execCommand ?? throw new ArgumentNullException(nameof(execCommand));
-            this.configProvider = configProvider ?? throw new ArgumentNullException(nameof(configFileLocator));
-            this.buildServerResolver = buildServerResolver ?? throw new ArgumentNullException(nameof(buildServerResolver));
-            this.gitPreparer = gitPreparer;
         }
 
-        public int Execute(Arguments arguments)
+        public int Execute(GitVersionOptions gitVersionOptions)
         {
-            var exitCode = VerifyArgumentsAndRun(arguments);
+            if (!HandleNonMainCommand(gitVersionOptions, out var exitCode))
+            {
+                exitCode = RunGitVersionTool(gitVersionOptions);
+            }
 
             if (exitCode != 0)
             {
                 // Dump log to console if we fail to complete successfully
-                Console.Write(log.ToString());
+                console.Write(log.ToString());
             }
 
             return exitCode;
         }
 
-        private int VerifyArgumentsAndRun(Arguments arguments)
+        private int RunGitVersionTool(GitVersionOptions gitVersionOptions)
         {
             try
             {
-                if (HandleNonMainCommand(arguments, out var exitCode)) return exitCode;
+                var variables = gitVersionTool.CalculateVersionVariables();
 
-                execCommand.Execute();
+                gitVersionTool.OutputVariables(variables);
+                gitVersionTool.UpdateAssemblyInfo(variables);
+                gitVersionTool.UpdateWixVersionFile(variables);
+
+                execCommand.Execute(variables);
             }
             catch (WarningException exception)
             {
@@ -65,14 +75,14 @@ namespace GitVersion
                 var error = $"An unexpected error occurred:{System.Environment.NewLine}{exception}";
                 log.Error(error);
 
-                if (arguments == null) return 1;
+                if (gitVersionOptions == null) return 1;
 
                 log.Info("Attempting to show the current git graph (please include in issue): ");
                 log.Info("Showing max of 100 commits");
 
                 try
                 {
-                    LibGitExtensions.DumpGraph(arguments.TargetPath, mess => log.Info(mess), 100);
+                    LibGitExtensions.DumpGraph(gitVersionOptions.WorkingDirectory, mess => log.Info(mess), 100);
                 }
                 catch (Exception dumpGraphException)
                 {
@@ -84,18 +94,17 @@ namespace GitVersion
             return 0;
         }
 
-        private bool HandleNonMainCommand(Arguments arguments, out int exitCode)
+        private bool HandleNonMainCommand(GitVersionOptions gitVersionOptions, out int exitCode)
         {
-            if (arguments == null)
+            if (gitVersionOptions == null)
             {
                 helpWriter.Write();
                 exitCode = 1;
                 return true;
             }
 
-            var targetPath = arguments.TargetPath;
 
-            if (arguments.IsVersion)
+            if (gitVersionOptions.IsVersion)
             {
                 var assembly = Assembly.GetExecutingAssembly();
                 versionWriter.Write(assembly);
@@ -103,59 +112,57 @@ namespace GitVersion
                 return true;
             }
 
-            if (arguments.IsHelp)
+            if (gitVersionOptions.IsHelp)
             {
                 helpWriter.Write();
                 exitCode = 0;
                 return true;
             }
 
-            if (arguments.Diag)
+            if (gitVersionOptions.Diag)
             {
-                arguments.NoCache = true;
-                arguments.Output.Add(OutputType.BuildServer);
+                gitVersionOptions.Settings.NoCache = true;
+                gitVersionOptions.Output.Add(OutputType.BuildServer);
             }
 
 #pragma warning disable CS0612 // Type or member is obsolete
-            if (!string.IsNullOrEmpty(arguments.Proj) || !string.IsNullOrEmpty(arguments.Exec))
+            if (!string.IsNullOrEmpty(gitVersionOptions.Proj) || !string.IsNullOrEmpty(gitVersionOptions.Exec))
 #pragma warning restore CS0612 // Type or member is obsolete
             {
-                arguments.Output.Add(OutputType.BuildServer);
+                gitVersionOptions.Output.Add(OutputType.BuildServer);
             }
 
-            var buildServer = buildServerResolver.Resolve();
-            arguments.NoFetch = arguments.NoFetch || buildServer != null && buildServer.PreventFetch();
+            ConfigureLogging(gitVersionOptions, log);
 
-            ConfigureLogging(arguments, log);
-
-            if (arguments.Diag)
+            var workingDirectory = gitVersionOptions.WorkingDirectory;
+            if (gitVersionOptions.Diag)
             {
                 log.Info("Dumping commit graph: ");
-                LibGitExtensions.DumpGraph(targetPath, mess => log.Info(mess), 100);
+                LibGitExtensions.DumpGraph(workingDirectory, mess => log.Info(mess), 100);
             }
 
-            if (!Directory.Exists(targetPath))
+            if (!Directory.Exists(workingDirectory))
             {
-                log.Warning($"The working directory '{targetPath}' does not exist.");
+                log.Warning($"The working directory '{workingDirectory}' does not exist.");
             }
             else
             {
-                log.Info("Working directory: " + targetPath);
+                log.Info("Working directory: " + workingDirectory);
             }
 
-            configFileLocator.Verify(gitPreparer);
+            configFileLocator.Verify(gitVersionOptions);
 
-            if (arguments.Init)
+            if (gitVersionOptions.Init)
             {
-                configProvider.Init(targetPath);
+                configProvider.Init(workingDirectory);
                 exitCode = 0;
                 return true;
             }
 
-            if (arguments.ShowConfig)
+            if (gitVersionOptions.ConfigInfo.ShowConfig)
             {
-                var config = configProvider.Provide(targetPath);
-                Console.WriteLine(config.ToString());
+                var config = configProvider.Provide(workingDirectory);
+                console.WriteLine(config.ToString());
                 exitCode = 0;
                 return true;
             }
@@ -164,16 +171,16 @@ namespace GitVersion
             return false;
         }
 
-        private static void ConfigureLogging(Arguments arguments, ILog log)
+        private static void ConfigureLogging(GitVersionOptions gitVersionOptions, ILog log)
         {
-            if (arguments.Output.Contains(OutputType.BuildServer) || arguments.LogFilePath == "console" || arguments.Init)
+            if (gitVersionOptions.Output.Contains(OutputType.BuildServer) || gitVersionOptions.LogFilePath == "console" || gitVersionOptions.Init)
             {
                 log.AddLogAppender(new ConsoleAppender());
             }
 
-            if (arguments.LogFilePath != null && arguments.LogFilePath != "console")
+            if (gitVersionOptions.LogFilePath != null && gitVersionOptions.LogFilePath != "console")
             {
-                log.AddLogAppender(new FileAppender(arguments.LogFilePath));
+                log.AddLogAppender(new FileAppender(gitVersionOptions.LogFilePath));
             }
         }
     }

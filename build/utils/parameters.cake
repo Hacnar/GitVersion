@@ -21,6 +21,7 @@ public class BuildParameters
     public bool EnabledPublishNuget { get; private set; }
     public bool EnabledPublishChocolatey { get; private set; }
     public bool EnabledPublishDocker { get; private set; }
+    public bool EnabledPublishRelease { get; private set; }
 
     public bool IsRunningOnUnix { get; private set; }
     public bool IsRunningOnWindows { get; private set; }
@@ -53,7 +54,7 @@ public class BuildParameters
     public BuildArtifacts Artifacts { get; private set; }
     public DockerImages Docker { get; private set; }
     public Dictionary<string, DirectoryPath> PackagesBuildMap { get; private set; }
-    public Dictionary<PlatformFamily, string> NativeRuntimes { get; private set; }
+    public Dictionary<PlatformFamily, string[]> NativeRuntimes { get; private set; }
 
     public bool IsStableRelease() => !IsLocalBuild && IsMainRepo && IsMainBranch && !IsPullRequest && IsTagged;
     public bool IsPreRelease()    => !IsLocalBuild && IsMainRepo && IsMainBranch && !IsPullRequest && !IsTagged;
@@ -84,6 +85,7 @@ public class BuildParameters
             EnabledPublishNuget       = context.IsEnabled("ENABLED_PUBLISH_NUGET"),
             EnabledPublishChocolatey  = context.IsEnabled("ENABLED_PUBLISH_CHOCOLATEY"),
             EnabledPublishDocker      = context.IsEnabled("ENABLED_PUBLISH_DOCKER"),
+            EnabledPublishRelease     = context.IsEnabled("ENABLED_PUBLISH_RELEASE"),
 
             IsRunningOnUnix    = context.IsRunningOnUnix(),
             IsRunningOnWindows = context.IsRunningOnWindows(),
@@ -136,11 +138,11 @@ public class BuildParameters
             ["GitVersion.Portable"] = Paths.Directories.ArtifactsBinPortable,
         };
 
-        NativeRuntimes = new Dictionary<PlatformFamily, string>
+        NativeRuntimes = new Dictionary<PlatformFamily, string[]>
         {
-            [PlatformFamily.Windows] = "win-x64",
-            [PlatformFamily.Linux]   = "linux-x64",
-            [PlatformFamily.OSX]     = "osx-x64",
+            [PlatformFamily.Windows] = new[] { "win-x64", "win-x86" },
+            [PlatformFamily.Linux]   = new[] { "debian.9-x64", "centos.7-x64", "fedora.30-x64", "ubuntu.16.04-x64", "ubuntu.18.04-x64" },
+            [PlatformFamily.OSX]     = new[] { "osx-x64" },
         };
 
         Credentials = BuildCredentials.GetCredentials(context);

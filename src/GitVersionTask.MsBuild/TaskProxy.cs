@@ -12,13 +12,13 @@ namespace GitVersion.MSBuildTask
         public static Func<UpdateAssemblyInfo, bool> UpdateAssemblyInfo;
         public static Func<WriteVersionInfoToBuildLog, bool> WriteVersionInfoToBuildLog;
 
-        public static Exception InitialiseException = null;
+        public static Exception InitialiseException;
         static TaskProxy()
         {
             try
             {
 #if !NETFRAMEWORK
-                GitLoaderContext.Init("GitVersionCore", "LibGit2Sharp");
+                GitLoaderContext.Init(typeof(TaskProxy).Assembly);
 #endif
                 LibGit2SharpLoader.LoadAssembly("GitVersionTask");
 
@@ -33,7 +33,6 @@ namespace GitVersion.MSBuildTask
             {
                 InitialiseException = e;
             }
-
         }
 
         private static Func<T, bool> GetMethod<T>(TypeInfo type, string name) => (Func<T, bool>)type.GetDeclaredMethod(name).CreateDelegate(typeof(Func<T, bool>));

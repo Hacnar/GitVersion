@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+        <TargetFramework>netstandard2.0</TargetFramework>
         <RootNamespace>GitVersion</RootNamespace>
         <DocumentationFile>bin\$(Configuration)\GitVersionCore.xml</DocumentationFile>
         <NoWarn>1591</NoWarn>
@@ -28,17 +28,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Remove="Extensions\GitVersionInformationResources\AddFormats\**\*.*" />
-        <Compile Remove="Extensions\GitVersionInformationResources\Templates\**\*.*" />
-        <Compile Remove="Extensions\VersionAssemblyInfoResources\AddFormats\**\*.*" />
-        <Compile Remove="Extensions\VersionAssemblyInfoResources\Templates\**\*.*" />
+        <Compile Remove="VersionConverters\*\AddFormats\**\*.*" />
+        <Compile Remove="VersionConverters\*\Templates\**\*.*" />
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="Extensions\GitVersionInformationResources\AddFormats\**\*.*" />
-        <EmbeddedResource Include="Extensions\GitVersionInformationResources\Templates\**\*.*" />
-        <EmbeddedResource Include="Extensions\VersionAssemblyInfoResources\AddFormats\**\*.*" />
-        <EmbeddedResource Include="Extensions\VersionAssemblyInfoResources\Templates\**\*.*" />
+        <EmbeddedResource Include="VersionConverters\*\AddFormats\**\*.*" />
+        <EmbeddedResource Include="VersionConverters\*\Templates\**\*.*" />
     </ItemGroup>
 
 </Project>

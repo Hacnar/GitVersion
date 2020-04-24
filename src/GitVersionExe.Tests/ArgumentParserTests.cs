@@ -1,29 +1,34 @@
 using GitVersion;
+using GitVersion.Logging;
+using GitVersion.Model;
+using GitVersionCore.Tests.Helpers;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Shouldly;
-using GitVersion.Exceptions;
-using GitVersion.Logging;
-using GitVersion.OutputFormatters;
-using GitVersionCore.Tests.Helpers;
+using Environment = System.Environment;
 
 namespace GitVersionExe.Tests
 {
     [TestFixture]
-    public class ArgumentParserTests
+    public class ArgumentParserTests : TestBase
     {
         private IArgumentParser argumentParser;
 
         [SetUp]
         public void SetUp()
         {
-            argumentParser = new ArgumentParser(new TestEnvironment());
+            var sp = ConfigureServices(services =>
+            {
+                services.AddSingleton<IArgumentParser, ArgumentParser>();
+            });
+            argumentParser = sp.GetService<IArgumentParser>();
         }
 
         [Test]
         public void EmptyMeansUseCurrentDirectory()
         {
             var arguments = argumentParser.ParseArguments("");
-            arguments.TargetPath.ShouldBe(System.Environment.CurrentDirectory);
+            arguments.TargetPath.ShouldBe(Environment.CurrentDirectory);
             arguments.LogFilePath.ShouldBe(null);
             arguments.IsHelp.ShouldBe(false);
         }
@@ -41,7 +46,7 @@ namespace GitVersionExe.Tests
         public void NoPathAndLogfileShouldUseCurrentDirectoryTargetDirectory()
         {
             var arguments = argumentParser.ParseArguments("-l logFilePath");
-            arguments.TargetPath.ShouldBe(System.Environment.CurrentDirectory);
+            arguments.TargetPath.ShouldBe(Environment.CurrentDirectory);
             arguments.LogFilePath.ShouldBe("logFilePath");
             arguments.IsHelp.ShouldBe(false);
         }
@@ -271,7 +276,6 @@ namespace GitVersionExe.Tests
         public void OverrideconfigWithNoOptions()
         {
             var arguments = argumentParser.ParseArguments("/overrideconfig");
-            arguments.HasOverrideConfig.ShouldBe(false);
             arguments.OverrideConfig.ShouldBeNull();
         }
 
@@ -279,7 +283,6 @@ namespace GitVersionExe.Tests
         public void OverrideconfigWithSingleTagprefixOption()
         {
             var arguments = argumentParser.ParseArguments("/overrideconfig tag-prefix=sample");
-            arguments.HasOverrideConfig.ShouldBe(true);
             arguments.OverrideConfig.TagPrefix.ShouldBe("sample");
         }
 
@@ -331,7 +334,7 @@ namespace GitVersionExe.Tests
         public void DynamicRepoLocation()
         {
             var arguments = argumentParser.ParseArguments("-dynamicRepoLocation c:\\foo\\");
-            arguments.DynamicRepositoryLocation.ShouldBe("c:\\foo\\");
+            arguments.DynamicRepositoryClonePath.ShouldBe("c:\\foo\\");
         }
 
         [Test]

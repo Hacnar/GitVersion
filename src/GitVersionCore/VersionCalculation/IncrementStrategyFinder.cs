@@ -2,10 +2,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using GitVersion.VersionCalculation;
-using LibGit2Sharp;
 using GitVersion.Configuration;
 using GitVersion.Extensions;
+using GitVersion.VersionCalculation;
+using LibGit2Sharp;
 
 namespace GitVersion
 {
@@ -24,14 +24,16 @@ namespace GitVersion
         public const string DefaultPatchPattern = @"\+semver:\s?(fix|patch)";
         public const string DefaultNoBumpPattern = @"\+semver:\s?(none|skip)";
 
+        private static readonly ConcurrentDictionary<string, Regex> CompiledRegexCache = new ConcurrentDictionary<string, Regex>();
+
         private static readonly Regex DefaultMajorPatternRegex = new Regex(DefaultMajorPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex DefaultMinorPatternRegex = new Regex(DefaultMinorPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex DefaultPatchPatternRegex = new Regex(DefaultPatchPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex DefaultNoBumpPatternRegex = new Regex(DefaultNoBumpPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public static VersionField? DetermineIncrementedField(GitVersionContext context, BaseVersion baseVersion)
+        public static VersionField? DetermineIncrementedField(IRepository repository, GitVersionContext context, BaseVersion baseVersion)
         {
-            var commitMessageIncrement = FindCommitMessageIncrement(context, baseVersion);
+            var commitMessageIncrement = FindCommitMessageIncrement(repository, context, baseVersion);
             var defaultIncrement = context.Configuration.Increment.ToVersionField();
 
             // use the default branch config increment strategy if there are no commit message overrides
@@ -55,24 +57,17 @@ namespace GitVersion
 
             return commitMessageIncrement;
         }
-
-        private static VersionField? FindCommitMessageIncrement(GitVersionContext context, BaseVersion baseVersion)
+        public static VersionField FindDefaultIncrementForBranch(GitVersionContext context, string branch = null)
         {
-            if (context.Configuration.CommitMessageIncrementing == CommitMessageIncrementMode.Disabled)
+            var config = context.FullConfiguration.GetConfigForBranch(branch ?? context.CurrentBranch.NameWithoutRemote());
+            if (config?.Increment != null && config.Increment != IncrementStrategy.Inherit)
             {
-                return null;
+                return config.Increment.Value.ToVersionField();
             }
 
-            var commits = GetIntermediateCommits(context.Repository, baseVersion.BaseVersionSource, context.CurrentCommit);
-
-            if (context.Configuration.CommitMessageIncrementing == CommitMessageIncrementMode.MergeMessageOnly)
-            {
-                commits = commits.Where(c => c.Parents.Count() > 1);
-            }
-
-            return GetIncrementForCommits(context, commits);
+            // Fallback to patch
+            return VersionField.Patch;
         }
-
         public static VersionField? GetIncrementForCommits(GitVersionContext context, IEnumerable<Commit> commits)
         {
             var majorRegex = TryGetRegexOrDefault(context.Configuration.MajorVersionBumpMessage, DefaultMajorPatternRegex);
@@ -94,6 +89,22 @@ namespace GitVersion
             return null;
         }
 
+        private static VersionField? FindCommitMessageIncrement(IRepository repository, GitVersionContext context, BaseVersion baseVersion)
+        {
+            if (context.Configuration.CommitMessageIncrementing == CommitMessageIncrementMode.Disabled)
+            {
+                return null;
+            }
+
+            var commits = GetIntermediateCommits(repository, baseVersion.BaseVersionSource, context.CurrentCommit);
+
+            if (context.Configuration.CommitMessageIncrementing == CommitMessageIncrementMode.MergeMessageOnly)
+            {
+                commits = commits.Where(c => c.Parents.Count() > 1);
+            }
+
+            return GetIncrementForCommits(context, commits);
+        }
         private static Regex TryGetRegexOrDefault(string messageRegex, Regex defaultRegex)
         {
             if (messageRegex == null)
@@ -103,7 +114,6 @@ namespace GitVersion
 
             return CompiledRegexCache.GetOrAdd(messageRegex, pattern => new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase));
         }
-
         private static IEnumerable<Commit> GetIntermediateCommits(IRepository repo, GitObject baseCommit, Commit headCommit)
         {
             if (baseCommit == null) yield break;
@@ -112,7 +122,7 @@ namespace GitVersion
 
             if (commitCache == null || commitCache.LastOrDefault() != headCommit)
             {
-                commitCache = repo.GetCommitsReacheableFromHead(headCommit);
+                commitCache = GetCommitsReacheableFromHead(repo, headCommit);
                 intermediateCommitCache = commitCache;
             }
 
@@ -126,7 +136,6 @@ namespace GitVersion
                     found = true;
             }
         }
-
         private static VersionField? GetIncrementFromMessage(string message, Regex majorRegex, Regex minorRegex, Regex patchRegex, Regex none)
         {
             if (majorRegex.IsMatch(message)) return VersionField.Major;
@@ -136,18 +145,15 @@ namespace GitVersion
             return null;
         }
 
-        private static readonly ConcurrentDictionary<string, Regex> CompiledRegexCache = new ConcurrentDictionary<string, Regex>();
-
-        public static VersionField FindDefaultIncrementForBranch(GitVersionContext context, string branch = null)
+        private static List<Commit> GetCommitsReacheableFromHead(IRepository repository, Commit headCommit)
         {
-            var config = context.FullConfiguration.GetConfigForBranch(branch ?? context.CurrentBranch.NameWithoutRemote());
-            if (config?.Increment != null && config.Increment != IncrementStrategy.Inherit)
+            var filter = new CommitFilter
             {
-                return config.Increment.Value.ToVersionField();
-            }
+                IncludeReachableFrom = headCommit,
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Reverse
+            };
 
-            // Fallback to patch
-            return VersionField.Patch;
+            return repository.Commits.QueryBy(filter).ToList();
         }
     }
 }

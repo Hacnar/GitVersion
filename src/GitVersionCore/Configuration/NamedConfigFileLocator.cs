@@ -1,20 +1,19 @@
 using System;
 using System.IO;
-using GitVersion.Exceptions;
 using Microsoft.Extensions.Options;
 
 namespace GitVersion.Configuration
 {
     public class NamedConfigFileLocator : ConfigFileLocator
     {
-        private readonly IOptions<Arguments> options;
+        private readonly IOptions<GitVersionOptions> options;
 
-        public NamedConfigFileLocator(IFileSystem fileSystem, IOptions<Arguments> options) : base(fileSystem)
+        public NamedConfigFileLocator(IFileSystem fileSystem, IOptions<GitVersionOptions> options) : base(fileSystem)
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
         }
 
-        public string FilePath => options.Value.ConfigFile;
+        public string FilePath => options.Value.ConfigInfo.ConfigFile;
 
         public override bool HasConfigFileAt(string workingDirectory) =>
             FileSystem.Exists(Path.Combine(workingDirectory, FilePath));

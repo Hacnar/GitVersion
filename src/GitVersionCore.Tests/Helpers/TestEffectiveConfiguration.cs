@@ -1,10 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using GitVersion;
-using GitVersion.Configuration;
 using GitVersion.Extensions;
-using GitVersion.VersionFilters;
-using GitVersion.VersioningModes;
+using GitVersion.Model.Configuration;
+using GitVersion.VersionCalculation;
 
 namespace GitVersionCore.Tests.Helpers
 {

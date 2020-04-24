@@ -1,12 +1,14 @@
+using GitVersion.Model.Configuration;
+
 namespace GitVersion.Configuration
 {
     public interface IConfigFileLocator
     {
         bool HasConfigFileAt(string workingDirectory);
         string GetConfigFilePath(string workingDirectory);
-        void Verify(IGitPreparer gitPreparer);
+        void Verify(GitVersionOptions gitVersionOptions);
         void Verify(string workingDirectory, string projectRootDirectory);
-        string SelectConfigFilePath(IGitPreparer gitPreparer);
+        string SelectConfigFilePath(GitVersionOptions gitVersionOptions);
         Config ReadConfig(string workingDirectory);
     }
 }

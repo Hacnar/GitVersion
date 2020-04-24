@@ -1,6 +1,6 @@
-using Microsoft.Build.Framework;
 using System;
 using System.Text;
+using Microsoft.Build.Framework;
 
 namespace GitVersionTask.MsBuild
 {
@@ -20,11 +20,7 @@ namespace GitVersionTask.MsBuild
         /// <param name="taskInstance">task containing an instance of this class</param>
         public TaskLoggingHelper(ITask taskInstance)
         {
-            if (taskInstance == null)
-            {
-                throw new ArgumentNullException(nameof(taskInstance));
-            }
-            _taskInstance = taskInstance;
+            _taskInstance = taskInstance ?? throw new ArgumentNullException(nameof(taskInstance));
             TaskName = taskInstance.GetType().Name;
         }
 
@@ -51,7 +47,7 @@ namespace GitVersionTask.MsBuild
         {
             get
             {
-                // If the task instance does not equal null then use its build engine because 
+                // If the task instance does not equal null then use its build engine because
                 // the task instances build engine can be changed for example during tests. This changing of the engine on the same task object is not expected to happen
                 // during normal operation.
                 if (_taskInstance != null)
@@ -104,7 +100,7 @@ namespace GitVersionTask.MsBuild
                 (
                     message,                             // message
                     null,                                // help keyword
-                    TaskName,                            // sender 
+                    TaskName,                            // sender
                     importance,                          // importance
                     DateTime.UtcNow,                     // timestamp
                     messageArgs                          // message arguments
@@ -217,7 +213,7 @@ namespace GitVersionTask.MsBuild
 
             if (showStackTrace)
             {
-                message += System.Environment.NewLine + exception.StackTrace;
+                message += Environment.NewLine + exception.StackTrace;
             }
 
             LogWarning(message);
@@ -333,13 +329,13 @@ namespace GitVersionTask.MsBuild
 
             string message;
 
-            if (!showDetail && (System.Environment.GetEnvironmentVariable("MSBUILDDIAGNOSTICS") == null)) // This env var is also used in ToolTask
+            if (!showDetail && (Environment.GetEnvironmentVariable("MSBUILDDIAGNOSTICS") == null)) // This env var is also used in ToolTask
             {
                 message = exception.Message;
 
                 if (showStackTrace)
                 {
-                    message += System.Environment.NewLine + exception.StackTrace;
+                    message += Environment.NewLine + exception.StackTrace;
                 }
             }
             else

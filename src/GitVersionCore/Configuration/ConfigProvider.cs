@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using GitVersion.Configuration.Init.Wizard;
 using GitVersion.Logging;
+using GitVersion.Model.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace GitVersion.Configuration
 {
@@ -10,22 +12,23 @@ namespace GitVersion.Configuration
         private readonly IFileSystem fileSystem;
         private readonly ILog log;
         private readonly IConfigFileLocator configFileLocator;
-        private readonly IGitPreparer gitPreparer;
+        private readonly IOptions<GitVersionOptions> options;
         private readonly IConfigInitWizard configInitWizard;
 
-        public ConfigProvider(IFileSystem fileSystem, ILog log, IConfigFileLocator configFileLocator, IGitPreparer gitPreparer, IConfigInitWizard configInitWizard)
+        public ConfigProvider(IFileSystem fileSystem, ILog log, IConfigFileLocator configFileLocator, IOptions<GitVersionOptions> options, IConfigInitWizard configInitWizard)
         {
             this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
             this.log = log ?? throw new ArgumentNullException(nameof(log));
             this.configFileLocator = configFileLocator ?? throw new ArgumentNullException(nameof(configFileLocator));
-            this.gitPreparer = gitPreparer ?? throw new ArgumentNullException(nameof(gitPreparer));
+            this.options = options ?? throw new ArgumentNullException(nameof(options));
             this.configInitWizard = configInitWizard ?? throw new ArgumentNullException(nameof(this.configInitWizard));
         }
 
         public Config Provide(bool applyDefaults = true, Config overrideConfig = null)
         {
-            var workingDirectory = gitPreparer.GetWorkingDirectory();
-            var projectRootDirectory = gitPreparer.GetProjectRootDirectory();
+            var gitVersionOptions = options.Value;
+            var workingDirectory = gitVersionOptions.WorkingDirectory;
+            var projectRootDirectory = gitVersionOptions.ProjectRootDirectory;
 
             var rootDirectory = configFileLocator.HasConfigFileAt(workingDirectory) ? workingDirectory : projectRootDirectory;
             return Provide(rootDirectory, applyDefaults, overrideConfig);
