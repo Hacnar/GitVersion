@@ -40,7 +40,7 @@ namespace GitVersionCore.Tests.BuildAgents
         }
 
         [Test]
-        [Ignore(temp)]
+        [Ignore("temp")]
         public void CanApplyToCurrentContext()
         {
             var applys = buildServer.CanApplyToCurrentContext();
